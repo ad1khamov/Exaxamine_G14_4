@@ -1,326 +1,185 @@
-window.addEventListener('load', () => {
-	const form = document.querySelector("#new-task-form");
-	const input = document.querySelector("#new-task-input");
-	const list_el = document.querySelector("#tasks");
+const token = localStorage.getItem("token");
+const base_url = "https://todo-for-n92.cyclic.app";
+const UserPlanInput = document.getElementById("UserPlan");
 
-	form.addEventListener('submit', (e) => {
-		e.preventDefault();
+const submitBtn = document.getElementById("submitBtn");
+RenderTask();
 
-		const task = input.value;
+//? ------------------------------------Todo add------------------
+submitBtn.addEventListener("click", async (e) => {
+	try {
+		const todo = await fetch(base_url + "/todos/add", {
+			method: "POST",
+			headers: {
+				"x-access-token": token,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				task: UserPlanInput.value,
+			}),
+		});
+		UserPlanInput.value = "";
+		const res = await todo.json();
+		console.log(res);
+		RenderTask();
+	} catch (e) {
+		console.log(e.message);
+	}
+});
 
-		const task_el = document.createElement('div');
-		task_el.classList.add('task');
+//? -----------------------------Render Task--------------------
+async function RenderTask() {
+	const tableTodo = document.getElementById("tableTodo");
 
-		const task_content_el = document.createElement('div');
-		task_content_el.classList.add('content');
+	try {
+		const todo = await fetch(base_url + "/todos/all", {
+			headers: {
+				"x-access-token": token,
+			},
+		});
+		const res = await todo.json();
+		console.log(res);
+		tableTodo.innerHTML = "";
+		res.allTodos.forEach((task) => {
+			const template = `
+      <tr>
+      <td class="w-100 justify-content-between" style:"
+width:auto;
+height:auto;
+background-color:rgba(17, 17, 17, 0.2);
+border-radius:20px;
+position:relative;
+left:-100px;
+      " scope="row">
+        <span>${task.task}</span>
+        <input type="checkbox" class="complated" value="${task.task}" onclick="complated('${task._id}')"  >
+      </td>
+      <td><button style="background-color: red; width: 90px;
+      height: 40px; color: white;  cursor: pointer;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold; border: none;" class="btn btn-danger" onclick="deleteTask('${task._id}')">Delete</button></td>
+      <td><button style=" width: 90px;
+      height: 40px; border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      background-color:blue;" class="btn btn-info"  data-bs-toggle="modal" data-bs-target="#exampleModal" onclick="renderUpdateTask('${task._id}')" >Update</button></td>
+    </tr>
+      `;
+			tableTodo.innerHTML += template;
+		});
+		isTrue();
+	} catch (e) {
+		console.log(e.message);
+	}
+}
 
-		task_el.appendChild(task_content_el);
-
-		const task_input_el = document.createElement('input');
-		task_input_el.classList.add('text');
-		task_input_el.type = 'text';
-		task_input_el.value = task;
-		task_input_el.setAttribute('readonly', 'readonly');
-
-		task_content_el.appendChild(task_input_el);
-
-		const task_actions_el = document.createElement('div');
-		task_actions_el.classList.add('actions');
-
-		const task_edit_el = document.createElement('button');
-		task_edit_el.classList.add('edit');
-		task_edit_el.innerText = 'Edit';
-
-		const task_delete_el = document.createElement('button');
-		task_delete_el.classList.add('delete');
-		task_delete_el.innerText = 'Delete';
-
-		task_actions_el.appendChild(task_edit_el);
-		task_actions_el.appendChild(task_delete_el);
-
-		task_el.appendChild(task_actions_el);
-
-		list_el.appendChild(task_el);
-
-		input.value = '';
-
-		task_edit_el.addEventListener('click', (e) => {
-			if (task_edit_el.innerText.toLowerCase() == "edit") {
-				task_edit_el.innerText = "Save";
-				task_input_el.removeAttribute("readonly");
-				task_input_el.focus();
-			} else {
-				task_edit_el.innerText = "Edit";
-				task_input_el.setAttribute("readonly", "readonly");
+async function isTrue() {
+	const complated = document.querySelectorAll(".complated");
+	console.log(complated[0].checked);
+	const task = await fetch(base_url + `/todos/all`, {
+		headers: {
+			"x-access-token": token,
+		},
+	});
+	const res = await task.json();
+	console.log(res);
+	res.allTodos.forEach((el) => {
+		complated.forEach((input) => {
+			if (el.task == input.value) {
+				input.checked = el.completed;
 			}
 		});
-
-		task_delete_el.addEventListener('click', (e) => {
-			list_el.removeChild(task_el);
-		});
 	});
-});
-
-
-
-const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-mongoose.connect('mongodb://localhost:27017/tasklist', { useNewUrlParser: true, useUnifiedTopology: true });
-const db = mongoose.connection;
-
-db.on('error', console.error.bind(console, 'MongoDB connection error:'));
-db.once('open', function () {
-  console.log('Connected to MongoDB');
-});
-
-const taskSchema = new mongoose.Schema({
-  text: String,
-  userId: String,
-});
-
-const Task = mongoose.model('Task', taskSchema);
-
-app.use(bodyParser.json());
-
-app.post('/tasks', async (req, res) => {
-  const { text, userId } = req.body;
-
-  try {
-    const task = new Task({ text, userId });
-    await task.save();
-    res.status(201).json(task);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-app.get('/tasks/:userId', async (req, res) => {
-  const userId = req.params.userId;
-
-  try {
-    const tasks = await Task.find({ userId });
-    res.status(200).json(tasks);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-app.delete('/tasks/:taskId', async (req, res) => {
-  const taskId = req.params.taskId;
-
-  try {
-    await Task.findByIdAndDelete(taskId);
-    res.status(204).end();
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-const apiUrl = 'https://todo-for-n92.cyclic.app/';
-
-
-
-window.addEventListener('load', () => {
-  const form = document.querySelector("#new-task-form");
-  const input = document.querySelector("#new-task-input");
-  const list_el = document.querySelector("#tasks");
-
-  const userId = 'replace-with-your-user-id';
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const task = input.value;
-
-    try {
-      const res = await fetch(`${apiUrl}/tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: task, userId }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to add task');
-      }
-
-      const newTask = await res.json();
-
-      const task_el = document.createElement('div');
-      task_el.classList.add('task');
-
-      const task_content_el = document.createElement('div');
-      task_content_el.classList.add('content');
-
-      task_el.appendChild(task_content_el);
-
-      const task_input_el = document.createElement('input');
-      task_input_el.classList.add('text');
-      task_input_el.type = 'text';
-      task_input_el.value = newTask.text;
-      task_input_el.setAttribute('readonly', 'readonly');
-
-      task_content_el.appendChild(task_input_el);
-
-      const task_actions_el = document.createElement('div');
-      task_actions_el.classList.add('actions');
-
-      const task_edit_el = document.createElement('button');
-      task_edit_el.classList.add('edit');
-      task_edit_el.innerText = 'Edit';
-
-      const task_delete_el = document.createElement('button');
-      task_delete_el.classList.add('delete');
-      task_delete_el.innerText = 'Delete';
-
-      task_actions_el.appendChild(task_edit_el);
-      task_actions_el.appendChild(task_delete_el);
-
-      task_el.appendChild(task_actions_el);
-
-      list_el.appendChild(task_el);
-
-      input.value = '';
-
-      task_edit_el.addEventListener('click', async () => {
-        if (task_edit_el.innerText.toLowerCase() == "edit") {
-          task_edit_el.innerText = "Save";
-          task_input_el.removeAttribute("readonly");
-          task_input_el.focus();
-        } else {
-          task_edit_el.innerText = "Edit";
-          task_input_el.setAttribute("readonly", "readonly");
-
-          try {
-            await fetch(`${apiUrl}/tasks/${newTask._id}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ text: task_input_el.value }),
-            });
-          } catch (error) {
-            console.error('Failed to edit task', error);
-          }
-        }
-      });
-
-      task_delete_el.addEventListener('click', async () => {
-        try {
-          await fetch(`${apiUrl}/tasks/${newTask._id}`, {
-            method: 'DELETE',
-          });
-
-          list_el.removeChild(task_el);
-        } catch (error) {
-          console.error('Failed to delete task', error);
-        }
-      });
-    } catch (error) {
-      console.error('Failed to add task', error);
-    }
-  });
-});
-
-
-
-
-const postInput = document.getElementById('postInput');
-const postList = document.getElementById('postList');
-
-async function fetchPosts() {
-    try {
-        const response = await fetch(' https://todo-for-n92.cyclic.app/todos/add
-        ');
-        const data = await response.json();
-        displayPosts(data);
-    } catch (error) {
-        console.error('Error fetching posts:', error);
-    }
 }
 
-function displayPosts(posts) {
-    postList.innerHTML = '';
-    posts.forEach(post => {
-        const newPost = document.createElement('li');
-        newPost.innerHTML = `<span>${post.title}</span>
-                             <button class="edit-btn" onclick="editPost(${post.id})">Edit</button>
-                             <button class="delete-btn" onclick="deletePost(${post.id})">Delete</button>`;
+//? -----------------------------Delete Task --------------------------
+async function deleteTask(id) {
+	try {
+		const task = await fetch(base_url + `/todos/${id}`, {
+			method: "DELETE",
+			headers: {
+				"x-access-token": token,
+			},
+		});
+		const res = await task.json();
+		console.log(res);
+		RenderTask();
+	} catch (e) {
+		console.log(e.message);
+	}
+}
+//? -----------------------------Update Task --------------------------
 
-        newPost.addEventListener('click', () => {
-            newPost.classList.toggle('completed');
-        });
-
-        postList.appendChild(newPost);
-    });
+async function renderUpdateTask(id) {
+	const modalBody = document.querySelector("#modal_body");
+	try {
+		const task = await fetch(base_url + `/todos/${id}`, {
+			headers: {
+				"x-access-token": token,
+			},
+		});
+		const res = await task.json();
+		const taskUser = res.todo;
+		modalBody.innerHTML = `
+     <div class="d-flex">
+      <input type="text" class="form-control" id="editInput" value="${taskUser.task}">
+      <input type="hidden" id="hiddenInput" value="'${taskUser._id}'">
+      <button type="button" class="btn btn-primary" id="saveTask" onclick="saveTask('${taskUser._id}')" data-bs-dismiss="modal">Save</button>
+     </div>
+    `;
+	} catch (e) {
+		console.log(e.message);
+	}
 }
 
-async function addPost() {
-    const postText = postInput.value.trim();
-    if (postText !== '') {
-        try {
-            const response = await fetch('https://todo-for-n92.cyclic.app/todos/:id', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    title: postText,
-                }),
-            });
-            const data = await response.json();
-            postInput.value = '';
-        } catch (error) {
-            console.error('Error adding post:', error);
-        }
-    }
+async function saveTask(id) {
+	const editInput = document.querySelector("#editInput");
+	try {
+		const task = await fetch(base_url + `/todos/${id}`, {
+			method: "PUT",
+			headers: {
+				"x-access-token": token,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				task: editInput.value,
+			}),
+		});
+		const res = await task.json();
+		console.log(res);
+		RenderTask();
+	} catch (e) {
+		console.log(e.message);
+	}
 }
 
-async function editPost(postId) {
-    const updatedText = prompt('Edit post:');
-    if (updatedText !== null) {
-        try {
-            const response = await fetch(`https://todo-for-n92.cyclic.app/todos?id={postId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    title: updatedText,
-                }),
-            });
-            const data = await response.json();
-        } catch (error) {
-            console.error('Error editing post:', error);
-        }
-    }
+//?-------------------Completed Task --------------------------------
+async function complated(id) {
+	try {
+		const task = await fetch(base_url + `/todos?id=${id}`, {
+			method: "PUT",
+			headers: {
+				"x-access-token": token,
+			},
+		});
+		const res = await task.json();
+		console.log(res);
+	} catch (e) {
+		console.log(e.message);
+	}
 }
 
-async function deletePost(postId) {
-    const confirmation = confirm('Are you sure you want to delete this post?');
-    if (confirmation) {
-        try {
-            const response = await fetch(`https://todo-for-n92.cyclic.app/todos/:id{postId}`, {
-                method: 'DELETE',
-            });
-        } catch (error) {
-            console.error('Error deleting post:', error);
-        }
-    }
+//? -----------------------------LogOut --------------------------------
+
+async function logOut() {
+	try {
+		localStorage.clear();
+		location.replace("../index.html");
+	} catch (e) {
+		console.log(e.message);
+	}
 }
-
-fetchPosts();
-
